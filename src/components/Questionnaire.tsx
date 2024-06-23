@@ -1,82 +1,56 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import './Questionnaire.css';
+import botImage from './assets/bot.png';
+import travelImage from './assets/travel.png';
+import trashImage from './assets/trash.png';
+import energyImage from './assets/energy.png';
+import waterImage from './assets/water.png';
+import plantImage from './assets/plant.png';
+
+const mockApiCall = async (answers: string[]) => {
+  return new Promise<{ [key: string]: number }>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        travel: Math.floor(Math.random() * 100),
+        trash: Math.floor(Math.random() * 100),
+        energy: Math.floor(Math.random() * 100),
+        water: Math.floor(Math.random() * 100),
+        plant: Math.floor(Math.random() * 100),
+      });
+    }, 1000);
+  });
+};
 
 const questions = [
-  "How often do you travel?",
-  "How much trash do you produce?",
-  "How much energy do you consume?",
-  "How much water do you use?",
-  "Do you have plants at home?",
+  {
+    question: "How often do you travel?",
+    image: travelImage,
+    fact: "Every year, millions of people use cars, which generates approximately 20 tonnes of carbon per person.",
+  },
+  {
+    question: "How much trash do you produce?",
+    image: trashImage,
+    fact: "The average person produces 4.4 pounds of trash per day, contributing significantly to carbon emissions.",
+  },
+  {
+    question: "How much energy do you consume?",
+    image: energyImage,
+    fact: "Household energy use is responsible for a large portion of an individual's carbon footprint.",
+  },
+  {
+    question: "How much water do you use?",
+    image: waterImage,
+    fact: "Water usage contributes to carbon emissions due to the energy required to treat and transport it.",
+  },
+  {
+    question: "Do you have plants at home?",
+    image: plantImage,
+    fact: "Having plants at home can help offset carbon emissions and improve air quality.",
+  },
 ];
 
-const Questionnaire: React.FC<{
-  setScores: (scores: { [key: string]: number }) => void;
-}> = ({ setScores }) => {
-  const options = (obj: Object) => ({
-    method: "POST",
-    header: {
-      "X-API-Key":
-        "65c95fb3-7f81-4a01-9419-b6f150340e56<__>1PTsFeETU8N2v5f4qmtDZVGS",
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify(obj),
-  });
-
-  const mockApiCall = async (answers: string[]) => {
-    const apiResponse = await Promise.all([
-      axios(
-        "https://chat-api.you.com/research",
-        options({
-          query: `Assume the role of a bot trying to measure the carbon footprint of a person, based on their description of how they travel everyday, rate that person's Carbon Footprint in the range of 0 to 100. The person's description is ${answers[0]}. Generate only a two-digit number, no other explanation or reasoning is required.`,
-          chat_id: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
-        })
-      ),
-      axios(
-        "https://chat-api.you.com/research",
-        options({
-          query: `Assume the role of a bot trying to measure the carbon footprint of a person, based on their description of how much trash do they produce everyday, rate that person's Carbon Footprint in the range of 0 to 100. The person's description is '${answers[1]}'. Generate only a two-digit number, no other explanation or reasoning is required.`,
-          chat_id: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
-        })
-      ),
-      axios(
-        "https://chat-api.you.com/research",
-        options({
-          query: `Assume the role of a bot trying to measure the carbon footprint of a person, based on their description of how much energy do they consume everyday, rate that person's Carbon Footprint in the range of 0 to 100. The person's description is '${answers[2]}'. Generate only a two-digit number, no other explanation or reasoning is required.`,
-          chat_id: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
-        })
-      ),
-      axios(
-        "https://chat-api.you.com/research",
-        options({
-          query: `Assume the role of a bot trying to measure the carbon footprint of a person, based on their description of how much water they use everyday, rate that person's Carbon Footprint in the range of 0 to 100. The person's description is '${answers[3]}'. Generate only a two-digit number, no other explanation or reasoning is required.`,
-          chat_id: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
-        })
-      ),
-      axios(
-        "https://chat-api.you.com/research",
-        options({
-          query: `Assume the role of a bot trying to measure the carbon footprint of a person, based on their description about how many plants do they have at home, rate that person's Carbon Footprint in the range of 0 to 100. The person's description is '${answers[4]}'. Generate only a two-digit number, no other explanation or reasoning is required.`,
-          chat_id: "3c90c3cc-0d44-4b50-8888-8dd25736052a",
-        })
-      ),
-    ]);
-
-    console.log(apiResponse);
-
-    // const travelScore = apiResponse.data.travel || Math.floor(Math.random() * 100);
-
-    return {
-      travel: Math.floor(Math.random() * 100),
-      trash: Math.floor(Math.random() * 100),
-      energy: Math.floor(Math.random() * 100),
-      water: Math.floor(Math.random() * 100),
-      plant: Math.floor(Math.random() * 100),
-    };
-  };
-  const [answers, setAnswers] = useState<string[]>(
-    Array(questions.length).fill("")
-  );
+const Questionnaire: React.FC<{ setScores: (scores: { [key: string]: number }) => void }> = ({ setScores }) => {
+  const [answers, setAnswers] = useState<string[]>(Array(questions.length).fill(''));
   const [currentQuestion, setCurrentQuestion] = useState<number>(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,16 +68,24 @@ const Questionnaire: React.FC<{
     }
   };
 
+  const progress = (currentQuestion / questions.length) * 100;
+
   return (
-    <div>
+    <div className="questionnaire-container">
       <h1>Carbon Footprint Questionnaire</h1>
-      <p>{questions[currentQuestion]}</p>
-      <input
-        type="text"
-        value={answers[currentQuestion]}
-        onChange={handleChange}
-      />
-      <button onClick={handleSubmit}>Next</button>
+      <img src={questions[currentQuestion].image} alt="Question Art" className="question-image" />
+      <p className="question-text">{questions[currentQuestion].question}</p>
+      <input type="text" value={answers[currentQuestion]} onChange={handleChange} className="question-input" />
+      <button onClick={handleSubmit} className="next-button">Next</button>
+      <div className="progress-container">
+        <div className="progress-bar" style={{ width: `${progress}%` }}></div>
+      </div>
+      <div className="bot-container">
+        <img src={botImage} alt="Bot" className="bot-image" />
+        <div className="bot-speech-bubble">
+          <p>{questions[currentQuestion].fact}</p>
+        </div>
+      </div>
     </div>
   );
 };

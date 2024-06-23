@@ -7,6 +7,8 @@ import {
   getBrowserSupportedMimeType,
 } from "hume";
 import { env } from "process";
+import './Chat.css';
+import botImage from './assets/bot.png';
 
 const client = new HumeClient({
   apiKey: "WLCo6BuawUWxKxQTF4MrJLwK8hczZiEiuYEOfohFsOOoZoS3",
@@ -88,6 +90,12 @@ const Chat: React.FC = () => {
         // play the next audio output
         setMessages(list);
         break;
+      case "tool_call":
+        if(message.name === 'addTasks'){
+          console.log("Message", message)
+        }
+
+        break;
     }
   }
 
@@ -144,21 +152,33 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <div>
+
+    <div className="chat-container">
+      <img src={botImage} alt="Bot" className="bot-image" />
       <h1>Chat with Carbon Footprint Bot</h1>
-      <div>
+      <div className="messages">
         {messages.map((msg, index) => (
           <p key={index}>{msg}</p>
         ))}
       </div>
-      <div>
+      <div className="recording-container">
         {isOpen && (
-          <button onClick={isRecording ? stopRecording : startRecording}>
+          <button onClick={isRecording ? stopRecording : startRecording} className="record-button">
             {isRecording ? "Stop Recording" : "Start Recording"}
           </button>
         )}
       </div>
-    </div>
+
+
+{/* <input
+  type="text"
+  value={input}
+  onChange={(e) => setInput(e.target.value)}
+  placeholder="Type your message here..."
+  className="chat-input"  // Add this class
+/>
+<button onClick={handleSend} className="send-button">Send</button>  // Add this class */}
+</div>
   );
 };
 
