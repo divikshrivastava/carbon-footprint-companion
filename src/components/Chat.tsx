@@ -1,139 +1,146 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Hume, HumeClient } from 'hume';
+import React, { useEffect, useState, useRef } from "react";
+import { Hume, HumeClient, MimeType, convertBase64ToBlob } from "hume";
 import {
   convertBlobToBase64,
-  convertBase64ToBlob,
   ensureSingleValidAudioTrack,
   getAudioStream,
   getBrowserSupportedMimeType,
-} from 'hume';
+} from "hume";
+import { env } from "process";
+
+const client = new HumeClient({
+  apiKey: "WLCo6BuawUWxKxQTF4MrJLwK8hczZiEiuYEOfohFsOOoZoS3",
+  secretKey: "hlfYbERRubR56lPNShRc47LBCRASePZoG53AI1ZEzsDBudbgSZqdQfrd2vhYki7h",
+});
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<string[]>([]);
-  const [input, setInput] = useState<string>('');
-  const [socket, setSocket] = useState<any| null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [socket, setSocket] = useState<any | null>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const audioQueue = useRef<Blob[]>([]);
-  const isPlayingRef = useRef<boolean>(false);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const currentAudio = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioQueue, setAudioQueue] = useState<Blob[]>([]);
 
   useEffect(() => {
-    const connectToHume = async () => {
-      const client = new HumeClient({
-        apiKey: process.env.REACT_APP_HUME_API_KEY as string,
-        secretKey: process.env.REACT_APP_HUME_SECRET_KEY as string,
-      });
-
-      const socket = await client.empathicVoice.chat.connect({
-        configId: 'edfdb17b-0a67-4c9e-9029-0bd40f98ca40',
-        onOpen: () => {
-          console.log('WebSocket connection opened');
-        },
-        onMessage: (message: any) => {
-          handleWebSocketMessageEvent(message);
-        },
-        onError: (error) => {
-          console.error(error);
-        },
-        onClose: () => {
-          console.log('WebSocket connection closed');
-        }
-      });
-
-      setSocket(socket);
-    };
-
     connectToHume();
   }, []);
 
-  const handleSend = () => {
-    if (socket && input.trim()) {
-      socket.sendUserMessage({ text: input });
-      setMessages((prev) => [...prev, `You: ${input}`]);
-      setInput('');
+  // the recorder responsible for recording the audio stream to be prepared as the audio input
+  // the stream of audio captured from the user's microphone
+  // mime type supported by the browser the application is running in
+  const mimeType: MimeType = (() => {
+    const result = getBrowserSupportedMimeType();
+    return result.success ? result.mimeType : MimeType.WEBM;
+  })();
+
+  // audio playback queue
+  // the current audio element to be played
+  // mime type supported by the browser the application is running in
+  // play the audio within the playback queue, converting each Blob into playable HTMLAudioElements
+  const connectToHume = async () => {
+    const socket = await client.empathicVoice.chat.connect({
+      configId: "338093fa-aeb5-44cd-9c32-a24b3ff21e02",
+      onOpen: () => {
+        setIsOpen(true);
+        console.log("WebSocket connection opened");
+      },
+      onMessage: (message: any) => {
+        console.log(message);
+        handleWebSocketMessageEvent(message);
+      },
+      onError: (error) => {
+        console.error(error);
+      },
+      onClose: () => {
+        setIsOpen(false);
+        console.log("WebSocket connection closed");
+      },
+    });
+
+    setSocket(socket);
+  };
+
+  function handleWebSocketMessageEvent(
+    message: Hume.empathicVoice.SubscribeEvent
+  ): void {
+    // place logic here which you would like to invoke when receiving a message through the socket
+    switch (message.type) {
+      // add received audio to the playback queue, and play next audio output
+      case "audio_output":
+        const queue = audioQueue;
+        // convert base64 encoded audio to a Blob
+        const audioOutput = message.data;
+        const blob = convertBase64ToBlob(audioOutput, mimeType);
+        // add audio Blob to audioQueue
+        queue.push(blob);
+        // play the next audio output
+        setAudioQueue(queue);
+        if (queue.length >= 1) playAudio();
+        break;
+      case "assistant_message":
+        const list = messages;
+        // convert base64 encoded audio to a Blob
+        const msg = message?.message?.content || "";
+        // add audio Blob to audioQueue
+        list.push(msg);
+        // play the next audio output
+        setMessages(list);
+        break;
     }
-  };
-
-  const handleAudioOutput = async (audioBase64: string) => {
-    const mimeTypeResult = getBrowserSupportedMimeType();
-    if (!mimeTypeResult.success) {
-      console.error('Browser does not support required mime types');
-      return;
-    }
-    const mimeType = mimeTypeResult.mimeType;
-    const audioBlob = convertBase64ToBlob(audioBase64, mimeType);
-    audioQueue.current.push(audioBlob);
-    playNextAudio();
-  };
-
-  const playNextAudio = () => {
-    if (isPlayingRef.current || audioQueue.current.length === 0) return;
-
-    isPlayingRef.current = true;
-    const audioBlob = audioQueue.current.shift();
-    if (!audioBlob) return;
-
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    audio.play();
-    audio.onended = () => {
-      isPlayingRef.current = false;
-      playNextAudio();
-    };
-  };
+  }
 
   const startRecording = async () => {
     setIsRecording(true);
     const audioStream = await getAudioStream();
     ensureSingleValidAudioTrack(audioStream);
-    const mimeTypeResult = getBrowserSupportedMimeType();
-    if (!mimeTypeResult.success) {
-      console.error('Browser does not support required mime types');
-      return;
-    }
-    const mimeType = mimeTypeResult.mimeType;
-    const recorder = new MediaRecorder(audioStream, { mimeType });
-    recorderRef.current = recorder;
-
-    recorder.ondataavailable = async ({ data }) => {
-      if (data.size > 0 && socket) {
-        const audioBase64 = await convertBlobToBase64(data);
-        socket.sendAudioInput({ data: audioBase64 });
-      }
+    recorder.current = new MediaRecorder(audioStream, { mimeType });
+    // callback for when recorded chunk is available to be processed
+    recorder.current.ondataavailable = async ({ data }) => {
+      // IF size of data is smaller than 1 byte then do nothing
+      if (data.size < 1) return;
+      // base64 encode audio data
+      const encodedAudioData = await convertBlobToBase64(data);
+      // define the audio_input message JSON
+      const audioInput: Omit<Hume.empathicVoice.AudioInput, "type"> = {
+        data: encodedAudioData,
+      };
+      // send audio_input message
+      socket?.sendAudioInput(audioInput);
     };
-
-    recorder.start(100);
+    // capture audio input at a rate of 100ms (recommended)
+    const timeSlice = 100;
+    recorder.current.start(timeSlice);
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    recorderRef.current?.stop();
+    recorder.current?.stop();
   };
 
-  const handleWebSocketMessageEvent = (message: any) => {
-    switch (message.type) {
-      case 'user_message':
-        setMessages((prev) => [...prev, `Bot: ${message.data.text}`]);
-        break;
-      case 'audio_output':
-        handleAudioOutput(message.data);
-        break;
-      case 'assistant_message':
-        setMessages((prev) => [...prev, `Bot: ${message.data.text}`]);
-        break;
-      case 'user_interruption':
-        stopAudio();
-        break;
-    }
-  };
-
-  const stopAudio = () => {
-    isPlayingRef.current = false;
-    audioQueue.current.length = 0;
-    const audioElement = document.querySelector('audio');
-    if (audioElement) {
-      audioElement.pause();
-    }
+  const playAudio = () => {
+    if (audioQueue.length == 0 || isPlaying) return;
+    // update isPlaying state
+    setIsPlaying(true);
+    // pull next audio output from the queue
+    const queue = audioQueue;
+    const audioBlob = queue.shift();
+    setAudioQueue(queue);
+    // IF audioBlob is unexpectedly undefined then do nothing
+    if (!audioBlob) return;
+    // converts Blob to AudioElement for playback
+    const audioUrl = URL.createObjectURL(audioBlob);
+    currentAudio.current = new Audio(audioUrl);
+    // play audio
+    currentAudio.current.play();
+    // callback for when audio finishes playing
+    currentAudio.current.onended = () => {
+      // update isPlaying state
+      setIsPlaying(false);
+      // attempt to pull next audio output from queue
+      if (audioQueue.length > 0) playAudio();
+    };
   };
 
   return (
@@ -144,16 +151,12 @@ const Chat: React.FC = () => {
           <p key={index}>{msg}</p>
         ))}
       </div>
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
-      <button onClick={handleSend}>Send</button>
       <div>
-        <button onClick={isRecording ? stopRecording : startRecording}>
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
-        </button>
+        {isOpen && (
+          <button onClick={isRecording ? stopRecording : startRecording}>
+            {isRecording ? "Stop Recording" : "Start Recording"}
+          </button>
+        )}
       </div>
     </div>
   );

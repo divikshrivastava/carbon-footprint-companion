@@ -1,6 +1,9 @@
-import React from 'react';
+import React from "react";
 
-const Results: React.FC<{ scores: { [key: string]: number } }> = ({ scores }) => {
+const Results: React.FC<{ scores: { [key: string]: number } }> = ({
+  scores,
+}) => {
+  console.log(scores);
   return (
     <div>
       <h1>Your Carbon Footprint Scores</h1>
@@ -14,5 +17,4 @@ const Results: React.FC<{ scores: { [key: string]: number } }> = ({ scores }) =>
     </div>
   );
 };
-
 export default Results;
